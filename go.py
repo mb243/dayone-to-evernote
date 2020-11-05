@@ -13,15 +13,11 @@ import markdown
 import webbrowser
 import urllib.parse
 
-
 # The follow two lines are a workaround to supress the following error message:
 # ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 #
-
-# https://dev.evernote.com/doc/articles/dev_tokens.php
-dev_token = ''
 
 # https://dev.evernote.com/doc/articles/authentication.php
 # https://requests-oauthlib.readthedocs.io/en/latest/oauth2_workflow.html#web-application-flow
@@ -30,6 +26,7 @@ client_id = ''
 client_secret = ''
 callback_url = 'localhost'
 token_url = 'https://sandbox.evernote.com/oauth'
+use_sandbox = True
 
 
 json_path = ''  # path to unzipped contents
@@ -63,10 +60,6 @@ def create_note(note_store: Store, note_title: str, note_content: str,
     header += '<en-note>'
     footer = '</en-note>'
 
-    # Perform HTML transformations for note text
-    # note_content = note_content.replace("\\n", '<br/>')
-    # note_content = note_content.replace("\\/", '/')
-
     note.content = header + note_content + footer
 
     try:
@@ -79,19 +72,16 @@ def create_note(note_store: Store, note_title: str, note_content: str,
     return note
 
 
-# def get_client_by_dev_token(dev_token: str) -> EvernoteClient:
-#     client = EvernoteClient(token=dev_token)
-#     return client
-
-def get_client_by_access_token(access_token: str) -> EvernoteClient:
-    client = EvernoteClient(token=access_token)
+def get_client_by_access_token(access_token: str, use_sandbox: bool) -> EvernoteClient:
+    # https://stackoverflow.com/questions/41710896/getuser-return-edamsystemexception-errorcode-8
+    client = EvernoteClient(token=access_token, sandbox=use_sandbox)
     return client
 
-def get_oauth_client(client_id: str, client_secret: str) -> str:
+def get_oauth_client(client_id: str, client_secret: str, use_sandbox: bool) -> str:
     client = EvernoteClient(
         consumer_key = client_id, 
         consumer_secret = client_secret,
-        sandbox=True
+        sandbox=use_sandbox
     )
     request_token = client.get_request_token('localhost')
     url = client.get_authorize_url(request_token)
@@ -108,16 +98,19 @@ def get_oauth_client(client_id: str, client_secret: str) -> str:
     )
     return access_token
 
-# access_token = get_oauth_client(client_id, client_secret)
+access_token = get_oauth_client(client_id, client_secret, use_sandbox)
+print(access_token)
 
-# client = get_client_by_access_token(access_token)
+client = get_client_by_access_token(access_token, use_sandbox)
 
-# userStore = client.get_user_store()
+userStore = client.get_user_store()
 # user = userStore.getUser()
-# print("username: " + user.username)
-# noteStore = client.get_note_store()
+# print("Logged in as: " + user.username)
 
-# notebook_guid = create_notebook(noteStore, datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+noteStore = client.get_note_store()
+noteStore.listNotebooks()
+
+notebook_guid = create_notebook(noteStore, datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
 
 with open(journal_json, 'r') as journal_file:
     data = json.load(journal_file)
@@ -131,19 +124,17 @@ for entry in data["entries"]:
         #   "creationDate" : "2018-06-06T16:00:00Z"
         entry_time = int(datetime.strptime(entry["creationDate"], '%Y-%m-%dT%H:%M:%S%z').timestamp() * 1000)
 
-
         first_line = entry_html.partition('\n')[0]
 
         if "<h1>" in first_line:  # If the first line is a formatted title, use it as the title line and remove it from the body
             title = first_line.replace('<h1>', '').replace('</h1>', '')
             entry_html = '\n'.join(entry_html.split('\n')[1:])
-        else:  # Leave the note untitled
-            title = ''
+        else:  # Title it literally 'Untitled'
+            title = 'Untitled'
 
         print("UUID: " + entry_uuid)
-        print("1st line: " + first_line)
-        print("title: " + title)
-        print()
-        print(entry_html)
+        print("Timestamp: " + str(entry_time))
+        print("title: " + str(title))
 
-        # note = create_note(noteStore, title, entry_html, notebook_guid, entry_time, entry_time)
+        note = create_note(noteStore, title, entry_html, notebook_guid, entry_time, entry_time)
+        print("Note created.")
