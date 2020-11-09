@@ -72,6 +72,10 @@ def create_note(note_store: Store, note_title: str, note_content: str,
     return note
 
 
+def get_client_by_dev_token(dev_token: str) -> EvernoteClient:
+    client = EvernoteClient(token=dev_token)
+    return client
+
 def get_client_by_access_token(access_token: str, use_sandbox: bool) -> EvernoteClient:
     # https://stackoverflow.com/questions/41710896/getuser-return-edamsystemexception-errorcode-8
     client = EvernoteClient(token=access_token, sandbox=use_sandbox)
@@ -98,8 +102,9 @@ def get_oauth_client(client_id: str, client_secret: str, use_sandbox: bool) -> s
     )
     return access_token
 
+# Comment out the following line if using a production dev token
 access_token = get_oauth_client(client_id, client_secret, use_sandbox)
-print(access_token)
+# print(access_token)
 
 client = get_client_by_access_token(access_token, use_sandbox)
 
